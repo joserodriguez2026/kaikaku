@@ -24,13 +24,12 @@ import {
 // 🔧 REEMPLAZA ESTOS VALORES con los de tu proyecto en Firebase Console
 // (Firebase Console → Project Settings → Your Apps → SDK setup → Config)
 const firebaseConfig = {
-  apiKey: "AIzaSyCIMTuck7pvWLgVwIOXRjdudOQMGYKH_6A",
-  authDomain: "kaikaku-mexicali.firebaseapp.com",
-  projectId: "kaikaku-mexicali",
-  storageBucket: "kaikaku-mexicali.firebasestorage.app",
-  messagingSenderId: "295914031234",
-  appId: "1:295914031234:web:a4af8a5f3b51564aa04c9b",
-  measurementId: "G-94M8FRZ6EH"
+  apiKey:            "REEMPLAZA_CON_TU_API_KEY",
+  authDomain:        "REEMPLAZA.firebaseapp.com",
+  projectId:         "REEMPLAZA_CON_TU_PROJECT_ID",
+  storageBucket:     "REEMPLAZA.appspot.com",
+  messagingSenderId: "REEMPLAZA",
+  appId:             "REEMPLAZA_CON_TU_APP_ID",
 };
 
 const app = initializeApp(firebaseConfig);
