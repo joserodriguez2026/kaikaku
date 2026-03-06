@@ -289,14 +289,14 @@ function FotosSection({kaizenId,isAdmin,onAddFoto,onDeleteFoto}){
         <div>
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"/>
-            <p style={{fontFamily:"Georgia, 'Times New Roman', serif",fontStyle:"italic",fontSize:"15px",fontWeight:"600",color:"#c2410c",letterSpacing:"0.02em"}}>Antes</p>
+            <p className="text-sm font-bold text-orange-600 tracking-wide">Antes</p>
           </div>
           <PhotoCollage fotos={fotos.antes} tipo="antes" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/>
         </div>
         <div>
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0"/>
-            <p style={{fontFamily:"Georgia, 'Times New Roman', serif",fontStyle:"italic",fontSize:"15px",fontWeight:"600",color:"#16a34a",letterSpacing:"0.02em"}}>Después</p>
+            <p className="text-sm font-bold text-green-600 tracking-wide">Después</p>
           </div>
           <PhotoCollage fotos={fotos.despues} tipo="despues" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/>
         </div>
