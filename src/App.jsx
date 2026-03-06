@@ -186,10 +186,12 @@ function KpiDisplay({kpis}){
                 <td className="px-3 py-2.5 text-center"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg font-medium">{r.valorObjetivo} {r.unidad}</span></td>
                 <td className="px-3 py-2.5 text-center">
                   {mejora
-                    ?<span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold ${mejora.bueno?"bg-green-50 text-green-600":"bg-red-50 text-red-500"}`}>
-                        {mejora.bueno?<TrendingUp size={10}/>:<TrendingDown size={10}/>}
-                        {mejora.signo}{mejora.pct}%
-                      </span>
+                    ? mejora.pct==="0.0"||mejora.pct==="0"
+                      ? <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold bg-yellow-50 text-yellow-500">= 0%</span>
+                      : <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold ${mejora.bueno?"bg-green-50 text-green-600":"bg-red-50 text-red-500"}`}>
+                          {mejora.bueno?<TrendingUp size={10}/>:<TrendingDown size={10}/>}
+                          {mejora.signo}{mejora.pct}%
+                        </span>
                     :<span className="text-gray-300">—</span>}
                 </td>
               </tr>
@@ -289,14 +291,14 @@ function FotosSection({kaizenId,isAdmin,onAddFoto,onDeleteFoto}){
         <div>
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"/>
-            <p className="text-sm font-bold text-orange-600 tracking-wide">Antes</p>
+            <p className="text-xs font-medium text-orange-600 tracking-wide">Antes</p>
           </div>
           <PhotoCollage fotos={fotos.antes} tipo="antes" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/>
         </div>
         <div>
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0"/>
-            <p className="text-sm font-bold text-green-600 tracking-wide">Después</p>
+            <p className="text-xs font-medium text-green-600 tracking-wide">Después</p>
           </div>
           <PhotoCollage fotos={fotos.despues} tipo="despues" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/>
         </div>
