@@ -37,7 +37,7 @@ const MAIN_STEPS = [
   "Organize 1-Hour Chrono TAKT","Keep Standard",
   "Identify Wastes & Opportunities","Lessons Learned & Celebrate",
 ];
-const UNITS = ["%","min","hrs","seg","días","semanas","meses","pzas","unidades","lotes","turnos","operadores","líneas","ciclos","m","cm","mm","km","m²","ft²","kg","lb","g","oz","ton","$","USD","MXN","€","defectos","PPM","DPMO","Sigma","ratio","índice","score","dB","°C","rpm"];
+const UNITS = ["%","min","hrs","seg","días","semanas","meses","pzas","unidades","lotes","turnos","operadores","líneas","ciclos","m","cm","mm","km","m²","ft","ft²","kg","lb","g","oz","ton","$","USD","MXN","€","defectos","PPM","DPMO","Sigma","ratio","índice","score","dB","°C","rpm"];
 const makeSteps = () => MAIN_STEPS.map(n => ({ nombre: n, tareas: [] }));
 const emptyForm = { nombre:"", area:"Ensamble de Válvulas", fechaInicio:"", fechaFin:"", responsable:"", estatus:"En Progreso", perfectExecution:false, fotos:{antes:[],despues:[]}, kpis:[], steps:makeSteps() };
 
@@ -50,8 +50,8 @@ const ymToMs   = ym => { if(!ym)return null; const[y,m]=ym.split("-").map(Number
 const MONTHS_ES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const formatYM  = ym => { if(!ym)return""; const[y,m]=ym.split("-").map(Number); return `${MONTHS_ES[m-1]} ${y}`; };
 
-// ── Comprimir imagen antes de guardar en Firestore ────────────────────────────
-const compressImage = (dataUrl, maxW=800, quality=0.7) => new Promise(resolve => {
+// ── Comprimir imagen agresivamente para respetar límite de Firestore (1MB/doc) ─
+const compressImage = (dataUrl, maxW=600, quality=0.45) => new Promise(resolve => {
   const img = new window.Image();
   img.onload = () => {
     const canvas = document.createElement("canvas");
@@ -61,6 +61,7 @@ const compressImage = (dataUrl, maxW=800, quality=0.7) => new Promise(resolve =>
     canvas.getContext("2d").drawImage(img, 0, 0, w, h);
     resolve(canvas.toDataURL("image/jpeg", quality));
   };
+  img.onerror = () => resolve(dataUrl); // fallback si falla
   img.src = dataUrl;
 });
 
@@ -118,20 +119,32 @@ function PinModal({onSuccess,onClose}){
 
 // ── KPI Table Edit ────────────────────────────────────────────────────────────
 function KpiTableEdit({kpis,onChange}){
-  const add=()=>onChange([...kpis,{nombre:"",valorActual:"",valorObjetivo:"",unidad:"%"}]);
+  const add=()=>onChange([...kpis,{nombre:"",valorActual:"",valorObjetivo:"",unidad:"%",menorEsMejor:false}]);
   const upd=(i,k,v)=>onChange(kpis.map((r,j)=>j===i?{...r,[k]:v}:r));
   const del=(i)=>onChange(kpis.filter((_,j)=>j!==i));
   return(
     <div>
       <div className="rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-xs">
-          <thead className="bg-gray-50 border-b border-gray-200"><tr><th className="text-left px-3 py-2.5 font-semibold text-gray-600">KPI</th><th className="text-center px-2 py-2.5 font-semibold text-orange-600 w-20">Actual</th><th className="text-center px-2 py-2.5 font-semibold text-blue-600 w-20">Objetivo</th><th className="text-center px-2 py-2.5 font-semibold text-gray-500 w-28">Unidad</th><th className="w-8"/></tr></thead>
+          <thead className="bg-gray-50 border-b border-gray-200"><tr><th className="text-left px-3 py-2.5 font-semibold text-gray-600">KPI</th><th className="text-center px-2 py-2.5 font-semibold text-orange-600 w-20">Actual</th><th className="text-center px-2 py-2.5 font-semibold text-blue-600 w-20">Objetivo</th><th className="text-center px-2 py-2.5 font-semibold text-gray-500 w-24">Unidad</th><th className="text-center px-2 py-2.5 font-semibold text-gray-500 w-28" title="¿Reducir este valor es una mejora?">↓ Menor es mejor</th><th className="w-8"/></tr></thead>
           <tbody>
-            {kpis.length===0&&<tr><td colSpan={5} className="text-center text-gray-400 italic py-5 text-xs">Sin KPIs. Agrega uno.</td></tr>}
-            {kpis.map((r,i)=>(<tr key={i} className="border-t border-gray-100"><td className="px-2 py-1.5"><input className="w-full border rounded-lg px-2 py-1 text-xs" value={r.nombre} onChange={e=>upd(i,"nombre",e.target.value)} placeholder="Indicador"/></td><td className="px-2 py-1.5"><input className="w-full border rounded-lg px-2 py-1 text-xs text-center" value={r.valorActual} onChange={e=>upd(i,"valorActual",e.target.value)} placeholder="0"/></td><td className="px-2 py-1.5"><input className="w-full border rounded-lg px-2 py-1 text-xs text-center" value={r.valorObjetivo} onChange={e=>upd(i,"valorObjetivo",e.target.value)} placeholder="0"/></td><td className="px-2 py-1.5"><select className="w-full border rounded-lg px-1 py-1 text-xs" value={r.unidad} onChange={e=>upd(i,"unidad",e.target.value)}>{UNITS.map(u=><option key={u}>{u}</option>)}</select></td><td className="px-2 py-1.5 text-center"><button onClick={()=>del(i)} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button></td></tr>))}
+            {kpis.length===0&&<tr><td colSpan={6} className="text-center text-gray-400 italic py-5 text-xs">Sin KPIs. Agrega uno.</td></tr>}
+            {kpis.map((r,i)=>(<tr key={i} className="border-t border-gray-100">
+              <td className="px-2 py-1.5"><input className="w-full border rounded-lg px-2 py-1 text-xs" value={r.nombre} onChange={e=>upd(i,"nombre",e.target.value)} placeholder="Indicador"/></td>
+              <td className="px-2 py-1.5"><input className="w-full border rounded-lg px-2 py-1 text-xs text-center" value={r.valorActual} onChange={e=>upd(i,"valorActual",e.target.value)} placeholder="0"/></td>
+              <td className="px-2 py-1.5"><input className="w-full border rounded-lg px-2 py-1 text-xs text-center" value={r.valorObjetivo} onChange={e=>upd(i,"valorObjetivo",e.target.value)} placeholder="0"/></td>
+              <td className="px-2 py-1.5"><select className="w-full border rounded-lg px-1 py-1 text-xs" value={r.unidad} onChange={e=>upd(i,"unidad",e.target.value)}>{UNITS.map(u=><option key={u}>{u}</option>)}</select></td>
+              <td className="px-2 py-1.5 text-center">
+                <button onClick={()=>upd(i,"menorEsMejor",!r.menorEsMejor)} className={`w-9 h-5 rounded-full transition-all duration-200 ${r.menorEsMejor?"bg-blue-500":"bg-gray-200"}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 mx-0.5 ${r.menorEsMejor?"translate-x-4":"translate-x-0"}`}/>
+                </button>
+              </td>
+              <td className="px-2 py-1.5 text-center"><button onClick={()=>del(i)} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button></td>
+            </tr>))}
           </tbody>
         </table>
       </div>
+      <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">💡 Activa <strong>↓ Menor es mejor</strong> en KPIs donde reducir el valor es una mejora (área, distancia, tiempo, defectos…)</p>
       <button onClick={add} className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"><Plus size={12}/> Agregar KPI</button>
     </div>
   );
@@ -155,16 +168,27 @@ function KpiDisplay({kpis}){
           {kpis.map((r,i)=>{
             const a=parseFloat(r.valorActual),o=parseFloat(r.valorObjetivo);
             let mejora=null;
-            if(!isNaN(a)&&!isNaN(o)&&a!==0){const d=((o-a)/Math.abs(a)*100).toFixed(1);mejora={val:d,pos:o>=a};}
+            if(!isNaN(a)&&!isNaN(o)&&a!==0){
+              const diff=((o-a)/Math.abs(a)*100).toFixed(1);
+              // Si menor es mejor: reducción = positivo (verde). Si mayor es mejor: aumento = positivo (verde).
+              const esMejora = r.menorEsMejor ? (o<=a) : (o>=a);
+              const pct = Math.abs(diff);
+              mejora={val:pct,pos:esMejora,diff};
+            }
             return(
               <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2.5 font-semibold text-gray-700">{r.nombre}</td>
+                <td className="px-3 py-2.5 font-semibold text-gray-700">
+                  {r.nombre}
+                  {r.menorEsMejor&&<span className="ml-1.5 text-[10px] text-gray-400 font-normal">↓</span>}
+                </td>
                 <td className="px-3 py-2.5 text-center"><span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-lg font-medium">{r.valorActual} {r.unidad}</span></td>
                 <td className="px-3 py-2.5 text-center"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg font-medium">{r.valorObjetivo} {r.unidad}</span></td>
                 <td className="px-3 py-2.5 text-center">
                   {mejora
                     ?<span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold ${mejora.pos?"bg-green-50 text-green-600":"bg-red-50 text-red-500"}`}>
-                        {mejora.pos?<TrendingUp size={10}/>:<TrendingDown size={10}/>}{mejora.pos?"+":""}{mejora.val}%
+                        {mejora.pos?<TrendingUp size={10}/>:<TrendingDown size={10}/>}
+                        {mejora.pos?"-":"+"}
+                        {mejora.val}%
                       </span>
                     :<span className="text-gray-300">—</span>}
                 </td>
@@ -200,16 +224,22 @@ function StepsEditor({steps,onChange}){
 
 // ── Photo Collage ─────────────────────────────────────────────────────────────
 function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
-  const fileRef=useRef();const[lightbox,setLightbox]=useState(null);const[uploading,setUploading]=useState(false);
+  const fileRef=useRef();const[lightbox,setLightbox]=useState(null);const[uploading,setUploading]=useState(false);const[error,setError]=useState("");
   const imgs=fotos||[];
   const handleFiles=async(e)=>{
-    setUploading(true);
-    for(const file of Array.from(e.target.files)){
-      const reader=new FileReader();
-      await new Promise(res=>{reader.onload=async ev=>{const compressed=await compressImage(ev.target.result);onAdd(tipo,compressed);res();};reader.readAsDataURL(file);});
+    setError("");setUploading(true);
+    const files=Array.from(e.target.files);
+    for(const file of files){
+      try{
+        const reader=new FileReader();
+        const dataUrl=await new Promise((res,rej)=>{reader.onload=ev=>res(ev.target.result);reader.onerror=()=>rej(new Error("Error leyendo archivo"));reader.readAsDataURL(file);});
+        const compressed=await compressImage(dataUrl);
+        await onAdd(tipo,compressed);
+      }catch(err){
+        setError("Una imagen no se pudo guardar. Intenta con otra imagen.");
+      }
     }
-    setUploading(false);
-    e.target.value="";
+    setUploading(false);e.target.value="";
   };
   const gridClass=()=>{if(imgs.length===0)return"";if(imgs.length===1)return"grid-cols-1";if(imgs.length===2)return"grid-cols-2";if(imgs.length===3)return"grid-cols-3";if(imgs.length===4)return"grid-cols-2";return"grid-cols-3";};
   const imgClass=(i,total)=>{if(total===1)return"aspect-video";if(total<=3)return"aspect-square";if(total===4)return"aspect-square";if(total>=5&&i===0)return"col-span-2 aspect-video";return"aspect-square";};
@@ -219,14 +249,15 @@ function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
         <div className={`rounded-xl border-2 border-dashed ${tipo==="antes"?"border-orange-200 bg-orange-50/50":"border-green-200 bg-green-50/50"} p-8 text-center`}>
           <Image size={22} className={`mx-auto mb-2 ${tipo==="antes"?"text-orange-300":"text-green-300"}`}/>
           <p className="text-xs text-gray-400 font-medium">Sin fotos {tipo==="antes"?"de antes":"de después"}</p>
-          {isAdmin&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${tipo==="antes"?"bg-orange-100 text-orange-600 hover:bg-orange-200":"bg-green-100 text-green-600 hover:bg-green-200"}`}>{uploading?"Subiendo...":"+ Subir fotos"}</button>}
+          {isAdmin&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${tipo==="antes"?"bg-orange-100 text-orange-600 hover:bg-orange-200":"bg-green-100 text-green-600 hover:bg-green-200"} disabled:opacity-50`}>{uploading?"Guardando...":"+ Subir fotos"}</button>}
         </div>
       ):(
         <div className={`grid ${gridClass()} gap-1.5 rounded-xl overflow-hidden`}>
           {imgs.map((src,i)=>(<div key={i} className={`relative group ${imgClass(i,imgs.length)} overflow-hidden bg-gray-100`}><img src={src} alt={`${tipo} ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/><div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"><button onClick={()=>setLightbox(src)} className="bg-white/95 text-gray-800 p-1.5 rounded-full shadow-lg hover:bg-white"><ZoomIn size={14}/></button>{isAdmin&&<button onClick={()=>onDelete(tipo,i)} className="bg-red-500/90 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><Trash2 size={14}/></button>}</div></div>))}
         </div>
       )}
-      {isAdmin&&imgs.length>0&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-2 flex items-center gap-1 text-xs font-semibold ${tipo==="antes"?"text-orange-500 hover:text-orange-700":"text-green-600 hover:text-green-800"}`}><Plus size={12}/>{uploading?"Subiendo...":"Agregar más"}</button>}
+      {isAdmin&&imgs.length>0&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-2 flex items-center gap-1 text-xs font-semibold disabled:opacity-50 ${tipo==="antes"?"text-orange-500 hover:text-orange-700":"text-green-600 hover:text-green-800"}`}><Plus size={12}/>{uploading?"Guardando...":"Agregar más"}</button>}
+      {error&&<p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">⚠️ {error}</p>}
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles}/>
       {lightbox&&(<div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4" onClick={()=>setLightbox(null)}><button className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"><X size={28}/></button><img src={lightbox} alt="foto" className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"/></div>)}
     </div>
@@ -439,8 +470,10 @@ export default function App(){
   };
   const addFoto=async(kid,tipo,src)=>{
     const k=items.find(x=>x.id===kid);if(!k)return;
-    const fotos={...(k.fotos||{antes:[],despues:[]}),[tipo]:[...(k.fotos?.[tipo]||[]),src]};
-    await setDoc(doc(db,COL,String(kid)),{...k,fotos});
+    const fotosActuales={antes:[],...(k.fotos||{})};
+    const nuevaLista=[...(fotosActuales[tipo]||[]),src];
+    const fotasNuevas={...fotosActuales,[tipo]:nuevaLista};
+    await setDoc(doc(db,COL,String(kid)),{...k,fotos:fotasNuevas});
   };
   const deleteFoto=async(kid,tipo,idx)=>{
     const k=items.find(x=>x.id===kid);if(!k)return;
@@ -494,6 +527,7 @@ export default function App(){
               <p className="text-sm font-bold text-gray-300">{items.length} Proyectos Registrados</p>
               <p className="text-xs text-gray-500">Área de Ensamble de Válvulas</p>
               <p className="text-xs text-gray-500 capitalize">{new Date().toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).replace(/^\w/,c=>c.toUpperCase())}</p>
+              <p className="text-xs text-gray-600 pt-1">Diseñado por <span className="text-gray-400 font-semibold">Jose Rodriguez</span></p>
             </div>
           </div>
         </div>
