@@ -26,6 +26,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 const COL = "kaizens";
+const FOTOS_COL = "fotos"; // colección separada para fotos de buena calidad
 
 const ADMIN_PIN = "Ascotech2026";
 const MAIN_STEPS = [
@@ -50,8 +51,8 @@ const ymToMs   = ym => { if(!ym)return null; const[y,m]=ym.split("-").map(Number
 const MONTHS_ES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const formatYM  = ym => { if(!ym)return""; const[y,m]=ym.split("-").map(Number); return `${MONTHS_ES[m-1]} ${y}`; };
 
-// ── Comprimir imagen agresivamente para respetar límite de Firestore (1MB/doc) ─
-const compressImage = (dataUrl, maxW=600, quality=0.45) => new Promise(resolve => {
+// ── Comprimir imagen — buena calidad, cada foto en su propio doc Firestore ────
+const compressImage = (dataUrl, maxW=1200, quality=0.82) => new Promise(resolve => {
   const img = new window.Image();
   img.onload = () => {
     const canvas = document.createElement("canvas");
@@ -61,7 +62,7 @@ const compressImage = (dataUrl, maxW=600, quality=0.45) => new Promise(resolve =
     canvas.getContext("2d").drawImage(img, 0, 0, w, h);
     resolve(canvas.toDataURL("image/jpeg", quality));
   };
-  img.onerror = () => resolve(dataUrl); // fallback si falla
+  img.onerror = () => resolve(dataUrl);
   img.src = dataUrl;
 });
 
@@ -161,7 +162,7 @@ function KpiDisplay({kpis}){
             <th className="text-left px-3 py-2.5 font-semibold text-gray-600">KPI</th>
             <th className="text-center px-3 py-2.5 font-semibold text-orange-600">Actual</th>
             <th className="text-center px-3 py-2.5 font-semibold text-blue-600">Objetivo</th>
-            <th className="text-center px-3 py-2.5 font-semibold text-green-600">Mejora</th>
+            <th className="text-center px-3 py-2.5 font-semibold text-green-600">Cambio</th>
           </tr>
         </thead>
         <tbody>
@@ -169,26 +170,25 @@ function KpiDisplay({kpis}){
             const a=parseFloat(r.valorActual),o=parseFloat(r.valorObjetivo);
             let mejora=null;
             if(!isNaN(a)&&!isNaN(o)&&a!==0){
-              const diff=((o-a)/Math.abs(a)*100).toFixed(1);
-              // Si menor es mejor: reducción = positivo (verde). Si mayor es mejor: aumento = positivo (verde).
-              const esMejora = r.menorEsMejor ? (o<=a) : (o>=a);
-              const pct = Math.abs(diff);
-              mejora={val:pct,pos:esMejora,diff};
+              const diff=((o-a)/Math.abs(a)*100); // cambio real con signo
+              const isAumento=o>a;
+              // Verde si: mayor es mejor Y sube, O menor es mejor Y baja
+              const esBueno=r.menorEsMejor?!isAumento:isAumento;
+              mejora={pct:Math.abs(diff).toFixed(1),signo:isAumento?"+":"-",bueno:esBueno};
             }
             return(
               <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2.5 font-semibold text-gray-700">
                   {r.nombre}
-                  {r.menorEsMejor&&<span className="ml-1.5 text-[10px] text-gray-400 font-normal">↓</span>}
+                  {r.menorEsMejor&&<span className="ml-1.5 text-[10px] text-gray-400 font-normal bg-gray-100 px-1 rounded">↓ menor</span>}
                 </td>
                 <td className="px-3 py-2.5 text-center"><span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded-lg font-medium">{r.valorActual} {r.unidad}</span></td>
                 <td className="px-3 py-2.5 text-center"><span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg font-medium">{r.valorObjetivo} {r.unidad}</span></td>
                 <td className="px-3 py-2.5 text-center">
                   {mejora
-                    ?<span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold ${mejora.pos?"bg-green-50 text-green-600":"bg-red-50 text-red-500"}`}>
-                        {mejora.pos?<TrendingUp size={10}/>:<TrendingDown size={10}/>}
-                        {mejora.pos?"-":"+"}
-                        {mejora.val}%
+                    ?<span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg font-bold ${mejora.bueno?"bg-green-50 text-green-600":"bg-red-50 text-red-500"}`}>
+                        {mejora.bueno?<TrendingUp size={10}/>:<TrendingDown size={10}/>}
+                        {mejora.signo}{mejora.pct}%
                       </span>
                     :<span className="text-gray-300">—</span>}
                 </td>
@@ -225,7 +225,7 @@ function StepsEditor({steps,onChange}){
 // ── Photo Collage ─────────────────────────────────────────────────────────────
 function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
   const fileRef=useRef();const[lightbox,setLightbox]=useState(null);const[uploading,setUploading]=useState(false);const[error,setError]=useState("");
-  const imgs=fotos||[];
+  const imgs=fotos||[]; // array de {id, src, ...}
   const handleFiles=async(e)=>{
     setError("");setUploading(true);
     const files=Array.from(e.target.files);
@@ -236,12 +236,12 @@ function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
         const compressed=await compressImage(dataUrl);
         await onAdd(tipo,compressed);
       }catch(err){
-        setError("Una imagen no se pudo guardar. Intenta con otra imagen.");
+        setError("No se pudo guardar la imagen. Intenta de nuevo.");
       }
     }
     setUploading(false);e.target.value="";
   };
-  const gridClass=()=>{if(imgs.length===0)return"";if(imgs.length===1)return"grid-cols-1";if(imgs.length===2)return"grid-cols-2";if(imgs.length===3)return"grid-cols-3";if(imgs.length===4)return"grid-cols-2";return"grid-cols-3";};
+  const gridClass=()=>{const n=imgs.length;if(n===0)return"";if(n===1)return"grid-cols-1";if(n===2)return"grid-cols-2";if(n===3)return"grid-cols-3";if(n===4)return"grid-cols-2";return"grid-cols-3";};
   const imgClass=(i,total)=>{if(total===1)return"aspect-video";if(total<=3)return"aspect-square";if(total===4)return"aspect-square";if(total>=5&&i===0)return"col-span-2 aspect-video";return"aspect-square";};
   return(
     <div>
@@ -249,29 +249,57 @@ function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
         <div className={`rounded-xl border-2 border-dashed ${tipo==="antes"?"border-orange-200 bg-orange-50/50":"border-green-200 bg-green-50/50"} p-8 text-center`}>
           <Image size={22} className={`mx-auto mb-2 ${tipo==="antes"?"text-orange-300":"text-green-300"}`}/>
           <p className="text-xs text-gray-400 font-medium">Sin fotos {tipo==="antes"?"de antes":"de después"}</p>
-          {isAdmin&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${tipo==="antes"?"bg-orange-100 text-orange-600 hover:bg-orange-200":"bg-green-100 text-green-600 hover:bg-green-200"} disabled:opacity-50`}>{uploading?"Guardando...":"+ Subir fotos"}</button>}
+          {isAdmin&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${tipo==="antes"?"bg-orange-100 text-orange-600 hover:bg-orange-200":"bg-green-100 text-green-600 hover:bg-green-200"}`}>{uploading?"Guardando...":"+ Subir fotos"}</button>}
         </div>
       ):(
         <div className={`grid ${gridClass()} gap-1.5 rounded-xl overflow-hidden`}>
-          {imgs.map((src,i)=>(<div key={i} className={`relative group ${imgClass(i,imgs.length)} overflow-hidden bg-gray-100`}><img src={src} alt={`${tipo} ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/><div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"><button onClick={()=>setLightbox(src)} className="bg-white/95 text-gray-800 p-1.5 rounded-full shadow-lg hover:bg-white"><ZoomIn size={14}/></button>{isAdmin&&<button onClick={()=>onDelete(tipo,i)} className="bg-red-500/90 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><Trash2 size={14}/></button>}</div></div>))}
+          {imgs.map((foto,i)=>(<div key={foto.id||i} className={`relative group ${imgClass(i,imgs.length)} overflow-hidden bg-gray-100`}><img src={foto.src} alt={`${tipo} ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/><div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"><button onClick={()=>setLightbox(foto.src)} className="bg-white/95 text-gray-800 p-1.5 rounded-full shadow-lg hover:bg-white"><ZoomIn size={14}/></button>{isAdmin&&<button onClick={()=>onDelete(foto.id)} className="bg-red-500/90 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><Trash2 size={14}/></button>}</div></div>))}
         </div>
       )}
       {isAdmin&&imgs.length>0&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-2 flex items-center gap-1 text-xs font-semibold disabled:opacity-50 ${tipo==="antes"?"text-orange-500 hover:text-orange-700":"text-green-600 hover:text-green-800"}`}><Plus size={12}/>{uploading?"Guardando...":"Agregar más"}</button>}
-      {error&&<p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">⚠️ {error}</p>}
+      {error&&<p className="text-xs text-red-500 mt-1.5">⚠️ {error}</p>}
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles}/>
       {lightbox&&(<div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4" onClick={()=>setLightbox(null)}><button className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"><X size={28}/></button><img src={lightbox} alt="foto" className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"/></div>)}
     </div>
   );
 }
 
-function FotosSection({fotos,isAdmin,onAddFoto,onDeleteFoto}){
-  const f=fotos||{antes:[],despues:[]};
+function FotosSection({kaizenId,isAdmin,onAddFoto,onDeleteFoto}){
+  const[fotos,setFotos]=useState({antes:[],despues:[]});
+  useEffect(()=>{
+    if(!kaizenId)return;
+    const q=collection(db,FOTOS_COL);
+    const unsub=onSnapshot(q,(snap)=>{
+      const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(f=>f.kaizenId===kaizenId);
+      const antes=all.filter(f=>f.tipo==="antes").sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+      const despues=all.filter(f=>f.tipo==="despues").sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+      setFotos({antes,despues});
+    });
+    return()=>unsub();
+  },[kaizenId]);
+  const total=(fotos.antes?.length||0)+(fotos.despues?.length||0);
   return(
     <div>
-      <div className="flex items-center gap-2 mb-4"><Camera size={14} className="text-gray-400"/><h3 className="text-sm font-bold text-gray-700">Evidencia Fotográfica</h3><span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{(f.antes?.length||0)+(f.despues?.length||0)} fotos</span></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div><div className="flex items-center gap-2 mb-2.5"><div className="w-2 h-2 rounded-full bg-orange-400"/><p className="text-xs font-bold text-orange-600 uppercase tracking-widest">Antes</p></div><PhotoCollage fotos={f.antes} tipo="antes" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/></div>
-        <div><div className="flex items-center gap-2 mb-2.5"><div className="w-2 h-2 rounded-full bg-green-500"/><p className="text-xs font-bold text-green-600 uppercase tracking-widest">Después</p></div><PhotoCollage fotos={f.despues} tipo="despues" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/></div>
+      <div className="flex items-center gap-2 mb-5">
+        <Camera size={14} className="text-gray-400"/>
+        <h3 className="text-sm font-bold text-gray-700">Evidencia Fotográfica</h3>
+        {total>0&&<span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{total} fotos</span>}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"/>
+            <p style={{fontFamily:"Georgia, 'Times New Roman', serif",fontStyle:"italic",fontSize:"15px",fontWeight:"600",color:"#c2410c",letterSpacing:"0.02em"}}>Antes</p>
+          </div>
+          <PhotoCollage fotos={fotos.antes} tipo="antes" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/>
+        </div>
+        <div>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0"/>
+            <p style={{fontFamily:"Georgia, 'Times New Roman', serif",fontStyle:"italic",fontSize:"15px",fontWeight:"600",color:"#16a34a",letterSpacing:"0.02em"}}>Después</p>
+          </div>
+          <PhotoCollage fotos={fotos.despues} tipo="despues" isAdmin={isAdmin} onAdd={onAddFoto} onDelete={onDeleteFoto}/>
+        </div>
       </div>
     </div>
   );
@@ -399,7 +427,7 @@ function KaizenDetail({kaizen:k,isAdmin,onEdit,onDelete,onClose,onUpdateTask,onA
       </div>
 
       {/* Fotos — al final */}
-      <FotosSection fotos={fotos} isAdmin={isAdmin} onAddFoto={(tipo,src)=>onAddFoto(k.id,tipo,src)} onDeleteFoto={(tipo,idx)=>onDeleteFoto(k.id,tipo,idx)}/>
+      <FotosSection kaizenId={k.id} isAdmin={isAdmin} onAddFoto={(tipo,src)=>onAddFoto(k.id,tipo,src)} onDeleteFoto={(fotoId)=>onDeleteFoto(fotoId)}/>
     </div>
   );
 }
@@ -469,16 +497,11 @@ export default function App(){
     await setDoc(doc(db,COL,String(kid)),{...kaizen,steps:updSteps});
   };
   const addFoto=async(kid,tipo,src)=>{
-    const k=items.find(x=>x.id===kid);if(!k)return;
-    const fotosActuales={antes:[],...(k.fotos||{})};
-    const nuevaLista=[...(fotosActuales[tipo]||[]),src];
-    const fotasNuevas={...fotosActuales,[tipo]:nuevaLista};
-    await setDoc(doc(db,COL,String(kid)),{...k,fotos:fotasNuevas});
+    const fotoId=String(Date.now())+"_"+Math.random().toString(36).slice(2,7);
+    await setDoc(doc(db,FOTOS_COL,fotoId),{kaizenId:kid,tipo,src,createdAt:Date.now()});
   };
-  const deleteFoto=async(kid,tipo,idx)=>{
-    const k=items.find(x=>x.id===kid);if(!k)return;
-    const fotos={...(k.fotos||{antes:[],despues:[]}),[tipo]:(k.fotos?.[tipo]||[]).filter((_,i)=>i!==idx)};
-    await setDoc(doc(db,COL,String(kid)),{...k,fotos});
+  const deleteFoto=async(fotoId)=>{
+    await deleteDoc(doc(db,FOTOS_COL,String(fotoId)));
   };
   const toggleSelect=(id)=>setSelectedId(p=>p===id?null:id);
 
