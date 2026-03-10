@@ -7,7 +7,8 @@ import {
   Plus, Trash2, X, ChevronDown, ChevronRight,
   Edit3, BarChart2, User, Calendar, MapPin, Layers,
   TrendingUp, TrendingDown, CheckCircle,
-  Clock, Lock, Flag, Loader, Camera, Image, ZoomIn
+  Clock, Lock, Flag, Loader, Camera, Image, ZoomIn,
+  LayoutTemplate, ClipboardList
 } from "lucide-react";
 
 import { initializeApp } from "firebase/app";
@@ -323,11 +324,12 @@ function SeccionFotos({kaizenId,titulo,icono,tipos,isAdmin,onAddFoto,onDeleteFot
     });
     return()=>unsub();
   },[kaizenId]);
+  const ICONOS={layout:<LayoutTemplate size={14} className="text-gray-400"/>,clipboard:<ClipboardList size={14} className="text-gray-400"/>};
   const totalFotos=Object.values(fotosPorTipo).reduce((s,a)=>s+(a?.length||0),0);
   return(
     <div className="mb-5">
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm">{icono}</span>
+        {ICONOS[icono]||<Layers size={14} className="text-gray-400"/>}
         <h3 className="text-sm font-bold text-gray-700">{titulo}</h3>
         {totalFotos>0&&<span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{totalFotos} fotos</span>}
       </div>
@@ -518,10 +520,10 @@ function KaizenDetail({kaizen:k,isAdmin,onEdit,onDelete,onClose,onUpdateTask,onA
       </div>
 
       {/* Layout */}
-      <SeccionFotos kaizenId={k.id} titulo="Layout" icono="📐" tipos={[{tipo:"layout-antes",label:"Antes",color:"orange"},{tipo:"layout-despues",label:"Después",color:"green"}]} isAdmin={isAdmin} onAddFoto={onAddFoto} onDeleteFoto={onDeleteFoto}/>
+      <SeccionFotos kaizenId={k.id} titulo="Layout" icono="layout" tipos={[{tipo:"layout-antes",label:"Antes",color:"orange"},{tipo:"layout-despues",label:"Después",color:"green"}]} isAdmin={isAdmin} onAddFoto={onAddFoto} onDeleteFoto={onDeleteFoto}/>
 
       {/* Standard Work */}
-      <SeccionFotos kaizenId={k.id} titulo="Standard Work" icono="📋" tipos={[{tipo:"sw-alto",label:"Línea Alto Volumen",color:"blue"},{tipo:"sw-bajo",label:"Línea Bajo Volumen",color:"violet"}]} isAdmin={isAdmin} onAddFoto={onAddFoto} onDeleteFoto={onDeleteFoto}/>
+      <SeccionFotos kaizenId={k.id} titulo="Standard Work" icono="clipboard" tipos={[{tipo:"sw-alto",label:"Línea Alto Volumen",color:"blue"},{tipo:"sw-bajo",label:"Línea Bajo Volumen",color:"violet"}]} isAdmin={isAdmin} onAddFoto={onAddFoto} onDeleteFoto={onDeleteFoto}/>
 
       {/* Fotos — al final */}
       <FotosSection kaizenId={k.id} isAdmin={isAdmin} onAddFoto={(tipo,src)=>onAddFoto(k.id,tipo,src)} onDeleteFoto={(fotoId)=>onDeleteFoto(fotoId)}/>
