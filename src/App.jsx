@@ -204,20 +204,55 @@ function KpiDisplay({kpis}){
 }
 
 // ── Steps Editor (en modal) ───────────────────────────────────────────────────
+const RESPONSABLES_SUGERIDOS = ["Jose Rodriguez","Miguel Molina","Adrian Arce"];
+
 function StepsEditor({steps,onChange}){
   const[open,setOpen]=useState(null);const[nt,setNt]=useState({});
-  const addTask=(si)=>{const t=nt[si];if(!t?.nombre?.trim())return;onChange(steps.map((s,i)=>i!==si?s:{...s,tareas:[...s.tareas,{nombre:t.nombre.trim(),responsable:t.responsable||"",avance:0}]}));setNt(p=>({...p,[si]:{nombre:"",responsable:""}}));};
+  const addTask=(si)=>{
+    const t=nt[si];if(!t?.nombre?.trim())return;
+    onChange(steps.map((s,i)=>i!==si?s:{...s,tareas:[...s.tareas,{nombre:t.nombre.trim(),responsable:t.responsable||"",dias:t.dias||"",avance:0}]}));
+    setNt(p=>({...p,[si]:{nombre:"",responsable:"",dias:""}}));
+  };
   const delTask=(si,ti)=>onChange(steps.map((s,i)=>i!==si?s:{...s,tareas:s.tareas.filter((_,j)=>j!==ti)}));
   const updTask=(si,ti,k,v)=>onChange(steps.map((s,i)=>i!==si?s:{...s,tareas:s.tareas.map((t,j)=>j!==ti?t:{...t,[k]:v})}));
   return(
     <div className="space-y-1.5">
+      <datalist id="responsables-list">{RESPONSABLES_SUGERIDOS.map(n=><option key={n} value={n}/>)}</datalist>
       {steps.map((s,si)=>{const pct=calcStepPct(s);const locked=!isUnlocked(steps,si);const isOpen=open===si;return(
         <div key={si} className={`border rounded-xl overflow-hidden ${locked?"border-gray-100 opacity-60":"border-gray-200"}`}>
           <button className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-left" onClick={()=>setOpen(isOpen?null:si)}>
             <div className="flex items-center gap-2 flex-1 min-w-0">{isOpen?<ChevronDown size={13} className="text-gray-400"/>:<ChevronRight size={13} className="text-gray-400"/>}<span className="text-xs text-gray-400 w-5">{si+1}.</span><span className={`text-xs font-semibold truncate ${locked?"text-gray-400":"text-gray-700"}`}>{s.nombre}</span>{locked&&<Lock size={10} className="text-gray-300 ml-1"/>}</div>
             <div className="flex items-center gap-2">{s.tareas.length>0&&<span className={`text-xs font-bold ${pctColor(pct)}`}>{pct}%</span>}<span className="text-xs text-gray-400">{s.tareas.length} tareas</span></div>
           </button>
-          {isOpen&&(<div className="p-3 space-y-2 bg-white border-t border-gray-100">{s.tareas.map((t,ti)=>(<div key={ti} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"><div className="flex-1 min-w-0"><input className="w-full bg-transparent text-xs font-semibold text-gray-700 focus:outline-none border-b border-transparent focus:border-gray-300" value={t.nombre} onChange={e=>updTask(si,ti,"nombre",e.target.value)}/><input className="w-full bg-transparent text-xs text-gray-400 focus:outline-none mt-0.5" value={t.responsable} onChange={e=>updTask(si,ti,"responsable",e.target.value)} placeholder="Responsable"/></div><input type="number" min="0" max="100" value={t.avance} onChange={e=>updTask(si,ti,"avance",Math.min(100,Math.max(0,+e.target.value)))} className="border rounded-lg w-14 text-xs text-center py-0.5 font-bold"/><span className="text-xs text-gray-400">%</span><button onClick={()=>delTask(si,ti)} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button></div>))}<div className="flex gap-1.5 pt-1"><input className="border rounded-lg px-2 py-1 text-xs flex-1" value={nt[si]?.nombre||""} onChange={e=>setNt(p=>({...p,[si]:{...p[si],nombre:e.target.value}}))} onKeyDown={e=>e.key==="Enter"&&addTask(si)} placeholder="Nueva tarea..."/><input className="border rounded-lg px-2 py-1 text-xs w-28" value={nt[si]?.responsable||""} onChange={e=>setNt(p=>({...p,[si]:{...p[si],responsable:e.target.value}}))} placeholder="Responsable"/><button onClick={()=>addTask(si)} className="bg-gray-700 text-white px-2 rounded-lg text-xs"><Plus size={12}/></button></div></div>)}
+          {isOpen&&(
+            <div className="p-3 space-y-2 bg-white border-t border-gray-100">
+              {s.tareas.map((t,ti)=>(
+                <div key={ti} className="bg-gray-50 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <input className="w-full bg-transparent text-xs font-semibold text-gray-700 focus:outline-none border-b border-transparent focus:border-gray-300" value={t.nombre} onChange={e=>updTask(si,ti,"nombre",e.target.value)} placeholder="Nombre de tarea"/>
+                      <input list="responsables-list" className="w-full bg-transparent text-xs text-gray-400 focus:outline-none mt-0.5" value={t.responsable} onChange={e=>updTask(si,ti,"responsable",e.target.value)} placeholder="Responsable"/>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <input type="number" min="1" value={t.dias||""} onChange={e=>updTask(si,ti,"dias",e.target.value)} className="border rounded-lg w-10 text-xs text-center py-0.5" placeholder="—"/>
+                      <span className="text-xs text-gray-400">días</span>
+                    </div>
+                    <input type="number" min="0" max="100" value={t.avance} onChange={e=>updTask(si,ti,"avance",Math.min(100,Math.max(0,+e.target.value)))} className="border rounded-lg w-14 text-xs text-center py-0.5 font-bold"/>
+                    <span className="text-xs text-gray-400">%</span>
+                    <button onClick={()=>delTask(si,ti)} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-1.5 pt-1 flex-wrap">
+                <input className="border rounded-lg px-2 py-1 text-xs flex-1 min-w-24" value={nt[si]?.nombre||""} onChange={e=>setNt(p=>({...p,[si]:{...p[si],nombre:e.target.value}}))} onKeyDown={e=>e.key==="Enter"&&addTask(si)} placeholder="Nueva tarea..."/>
+                <input list="responsables-list" className="border rounded-lg px-2 py-1 text-xs w-32" value={nt[si]?.responsable||""} onChange={e=>setNt(p=>({...p,[si]:{...p[si],responsable:e.target.value}}))} placeholder="Responsable"/>
+                <div className="flex items-center gap-1">
+                  <input type="number" min="1" className="border rounded-lg px-2 py-1 text-xs w-14" value={nt[si]?.dias||""} onChange={e=>setNt(p=>({...p,[si]:{...p[si],dias:e.target.value}}))} placeholder="días"/>
+                </div>
+                <button onClick={()=>addTask(si)} className="bg-gray-700 text-white px-2 rounded-lg text-xs"><Plus size={12}/></button>
+              </div>
+            </div>
+          )}
         </div>
       );})}
     </div>
@@ -225,9 +260,11 @@ function StepsEditor({steps,onChange}){
 }
 
 // ── Photo Collage ─────────────────────────────────────────────────────────────
-function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
+function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete,colorOverride}){
   const fileRef=useRef();const[lightbox,setLightbox]=useState(null);const[uploading,setUploading]=useState(false);const[error,setError]=useState("");
-  const imgs=fotos||[]; // array de {id, src, ...}
+  const imgs=fotos||[];
+  const isAntes=tipo==="antes"||tipo.endsWith("-antes");
+  const c=colorOverride||(isAntes?{border:"border-orange-200",bg:"bg-orange-50/50",icon:"text-orange-300",btn:"bg-orange-100 text-orange-600 hover:bg-orange-200",add:"text-orange-500 hover:text-orange-700"}:{border:"border-green-200",bg:"bg-green-50/50",icon:"text-green-300",btn:"bg-green-100 text-green-600 hover:bg-green-200",add:"text-green-600 hover:text-green-800"});
   const handleFiles=async(e)=>{
     setError("");setUploading(true);
     const files=Array.from(e.target.files);
@@ -248,20 +285,69 @@ function PhotoCollage({fotos,tipo,isAdmin,onAdd,onDelete}){
   return(
     <div>
       {imgs.length===0?(
-        <div className={`rounded-xl border-2 border-dashed ${tipo==="antes"?"border-orange-200 bg-orange-50/50":"border-green-200 bg-green-50/50"} p-8 text-center`}>
-          <Image size={22} className={`mx-auto mb-2 ${tipo==="antes"?"text-orange-300":"text-green-300"}`}/>
-          <p className="text-xs text-gray-400 font-medium">Sin fotos {tipo==="antes"?"de antes":"de después"}</p>
-          {isAdmin&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${tipo==="antes"?"bg-orange-100 text-orange-600 hover:bg-orange-200":"bg-green-100 text-green-600 hover:bg-green-200"}`}>{uploading?"Guardando...":"+ Subir fotos"}</button>}
+        <div className={`rounded-xl border-2 border-dashed ${c.border} ${c.bg} p-8 text-center`}>
+          <Image size={22} className={`mx-auto mb-2 ${c.icon}`}/>
+          <p className="text-xs text-gray-400 font-medium">Sin fotos</p>
+          {isAdmin&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${c.btn}`}>{uploading?"Guardando...":"+ Subir foto"}</button>}
         </div>
       ):(
         <div className={`grid ${gridClass()} gap-1.5 rounded-xl overflow-hidden`}>
-          {imgs.map((foto,i)=>(<div key={foto.id||i} className={`relative group ${imgClass(i,imgs.length)} overflow-hidden bg-gray-100`}><img src={foto.src} alt={`${tipo} ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/><div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"><button onClick={()=>setLightbox(foto.src)} className="bg-white/95 text-gray-800 p-1.5 rounded-full shadow-lg hover:bg-white"><ZoomIn size={14}/></button>{isAdmin&&<button onClick={()=>onDelete(foto.id)} className="bg-red-500/90 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><Trash2 size={14}/></button>}</div></div>))}
+          {imgs.map((foto,i)=>(<div key={foto.id||i} className={`relative group ${imgClass(i,imgs.length)} overflow-hidden bg-gray-100`}><img src={foto.src} alt={`foto ${i+1}`} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/><div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"><button onClick={()=>setLightbox(foto.src)} className="bg-white/95 text-gray-800 p-1.5 rounded-full shadow-lg hover:bg-white"><ZoomIn size={14}/></button>{isAdmin&&<button onClick={()=>onDelete(foto.id)} className="bg-red-500/90 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><Trash2 size={14}/></button>}</div></div>))}
         </div>
       )}
-      {isAdmin&&imgs.length>0&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-2 flex items-center gap-1 text-xs font-semibold disabled:opacity-50 ${tipo==="antes"?"text-orange-500 hover:text-orange-700":"text-green-600 hover:text-green-800"}`}><Plus size={12}/>{uploading?"Guardando...":"Agregar más"}</button>}
+      {isAdmin&&imgs.length>0&&<button onClick={()=>fileRef.current.click()} disabled={uploading} className={`mt-2 flex items-center gap-1 text-xs font-semibold disabled:opacity-50 ${c.add}`}><Plus size={12}/>{uploading?"Guardando...":"Agregar más"}</button>}
       {error&&<p className="text-xs text-red-500 mt-1.5">⚠️ {error}</p>}
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles}/>
       {lightbox&&(<div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4" onClick={()=>setLightbox(null)}><button className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"><X size={28}/></button><img src={lightbox} alt="foto" className="max-w-full max-h-full rounded-xl shadow-2xl object-contain"/></div>)}
+    </div>
+  );
+}
+
+// ── Sección Fotos Genérica (Layout, Standard Work, Evidencia) ─────────────────
+const COLOR_MAP = {
+  orange:{dot:"bg-orange-400",label:"text-orange-600",border:"border-orange-200",bg:"bg-orange-50/50",icon:"text-orange-300",btn:"bg-orange-100 text-orange-600 hover:bg-orange-200",add:"text-orange-500 hover:text-orange-700"},
+  green: {dot:"bg-green-500", label:"text-green-600", border:"border-green-200", bg:"bg-green-50/50",  icon:"text-green-300",  btn:"bg-green-100 text-green-600 hover:bg-green-200",   add:"text-green-600 hover:text-green-800"},
+  blue:  {dot:"bg-blue-500",  label:"text-blue-600",  border:"border-blue-200",  bg:"bg-blue-50/50",   icon:"text-blue-300",   btn:"bg-blue-100 text-blue-600 hover:bg-blue-200",       add:"text-blue-500 hover:text-blue-700"},
+  violet:{dot:"bg-violet-500",label:"text-violet-600",border:"border-violet-200",bg:"bg-violet-50/50", icon:"text-violet-300", btn:"bg-violet-100 text-violet-600 hover:bg-violet-200", add:"text-violet-500 hover:text-violet-700"},
+};
+
+function SeccionFotos({kaizenId,titulo,icono,tipos,isAdmin,onAddFoto,onDeleteFoto}){
+  const[fotosPorTipo,setFotosPorTipo]=useState({});
+  useEffect(()=>{
+    if(!kaizenId)return;
+    const unsub=onSnapshot(collection(db,FOTOS_COL),(snap)=>{
+      const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(f=>f.kaizenId===kaizenId&&tipos.some(t=>t.tipo===f.tipo));
+      const grouped={};
+      tipos.forEach(t=>{grouped[t.tipo]=all.filter(f=>f.tipo===t.tipo).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));});
+      setFotosPorTipo(grouped);
+    });
+    return()=>unsub();
+  },[kaizenId]);
+  const totalFotos=Object.values(fotosPorTipo).reduce((s,a)=>s+(a?.length||0),0);
+  return(
+    <div className="mb-5">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm">{icono}</span>
+        <h3 className="text-sm font-bold text-gray-700">{titulo}</h3>
+        {totalFotos>0&&<span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{totalFotos} fotos</span>}
+      </div>
+      <div className={`grid grid-cols-1 ${tipos.length>1?"md:grid-cols-2":""} gap-6`}>
+        {tipos.map(({tipo,label,color})=>{
+          const c=COLOR_MAP[color]||COLOR_MAP.blue;
+          return(
+            <div key={tipo}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`}/>
+                <p className={`text-xs font-medium tracking-wide ${c.label}`}>{label}</p>
+              </div>
+              <PhotoCollage fotos={fotosPorTipo[tipo]||[]} tipo={tipo} isAdmin={isAdmin}
+                onAdd={(t,src)=>onAddFoto(kaizenId,t,src)}
+                onDelete={onDeleteFoto}
+                colorOverride={c}/>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -406,7 +492,10 @@ function KaizenDetail({kaizen:k,isAdmin,onEdit,onDelete,onClose,onUpdateTask,onA
                           <div className="flex justify-between items-start mb-1.5">
                             <div className="flex-1 min-w-0 mr-3">
                               <p className="text-xs font-semibold text-gray-700">{t.nombre}</p>
-                              {t.responsable&&<p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"><User size={9}/>{t.responsable}</p>}
+                              <div className="flex items-center gap-3 mt-0.5">
+                                {t.responsable&&<p className="text-xs text-gray-400 flex items-center gap-1"><User size={9}/>{t.responsable}</p>}
+                                {t.dias&&<p className="text-xs text-gray-400 flex items-center gap-1"><Clock size={9}/>{t.dias} día{t.dias!=="1"?"s":""}</p>}
+                              </div>
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                               {isAdmin
@@ -427,6 +516,12 @@ function KaizenDetail({kaizen:k,isAdmin,onEdit,onDelete,onClose,onUpdateTask,onA
           })}
         </div>
       </div>
+
+      {/* Layout */}
+      <SeccionFotos kaizenId={k.id} titulo="Layout" icono="📐" tipos={[{tipo:"layout-antes",label:"Antes",color:"orange"},{tipo:"layout-despues",label:"Después",color:"green"}]} isAdmin={isAdmin} onAddFoto={onAddFoto} onDeleteFoto={onDeleteFoto}/>
+
+      {/* Standard Work */}
+      <SeccionFotos kaizenId={k.id} titulo="Standard Work" icono="📋" tipos={[{tipo:"sw-alto",label:"Línea Alto Volumen",color:"blue"},{tipo:"sw-bajo",label:"Línea Bajo Volumen",color:"violet"}]} isAdmin={isAdmin} onAddFoto={onAddFoto} onDeleteFoto={onDeleteFoto}/>
 
       {/* Fotos — al final */}
       <FotosSection kaizenId={k.id} isAdmin={isAdmin} onAddFoto={(tipo,src)=>onAddFoto(k.id,tipo,src)} onDeleteFoto={(fotoId)=>onDeleteFoto(fotoId)}/>
